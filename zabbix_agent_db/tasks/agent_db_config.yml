@@ -1,0 +1,54 @@
+---
+- name: "Gathering facts"
+  setup:
+    gather_subset: network
+
+- name: Copy module package to target host
+  copy:
+      dest: /tmp/
+      src: "{{ distr_path }}/libzbxpgsql-1.1.0-1.el7.x86_64.rpm.tar.gz"
+      group: root 
+      mode: 664 
+      owner: root
+
+- name: Extract lib archive
+  unarchive:
+    src: /tmp/libzbxpgsql-1.1.0-1.el7.x86_64.rpm.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Install zabbix-agent postgressql module
+  yum:
+    name: /tmp/libzbxpgsql-1.1.0-1.el7.x86_64.rpm 
+    disable_gpg_check: yes 
+    state: present
+
+- name: "Get ip and hostname monitoring server"
+  set_fact:
+      key_value: host_monitor
+  loop: "{{ groups['ERC_MONITORING-servers'] }}"
+  register: host_monitor
+
+- name: "Register the host in zabbix inventory"
+  local_action: 
+    module: zabbix_host
+    server_url: "{{zabbix_url}}"
+    login_user: "{{zabbix_admin_user}}"
+    login_password: "{{users.zabbix_admin_password}}"
+    state: present
+    host_name: "{{ inventory_hostname }}"
+    visible_name: "{{ inventory_hostname }}"
+    inventory_mode: automatic
+    interfaces: "{{ zabbix_agent_interfaces }}"
+    link_templates: 
+      - Template OS Linux
+      - Template App PostgreSQL
+    status: enabled
+    host_groups: "{{ group_names }}"
+  register: hostregister  
+
+- name: Restart service zabbix_agent 
+  service:
+    name: "{{ zabbix_agent_service }}"
+    state: restarted
+  when:  hostregister.changed

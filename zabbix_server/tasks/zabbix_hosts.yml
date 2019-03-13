@@ -1,0 +1,26 @@
+---
+- name: Register a hosts in zabbbix inventory
+  local_action:
+    module: zabbix_host
+    server_url: "{{ zabbix_url }}"
+    login_user: "{{zabbix_admin_user}}"
+    login_password: "{{users.zabbix_admin_password}}"
+    state: present
+    inventory_mode: automatic
+    interfaces: 
+      - type: 1
+        main: 1
+        useip: 0
+        ip: ""
+        dns: "{{ item }}.{{ domain }}"
+        port: "10050"
+     #{{ zabbix_agent_interfaces }}"
+    link_templates: 
+      - Template OS Linux
+    status: enabled
+    host_groups: Discovered hosts
+    host_name: "{{ item }}"
+    visible_name: "{{ item }}"
+  with_inventory_hostnames:
+    - all
+    

@@ -1,0 +1,68 @@
+---
+- name: Get auth token
+  uri:
+    url: "{{ zabbix_url }}/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    headers: 
+      Content-Type: application/json-rpc
+    force_basic_auth: yes
+    user:  "{{zabbix_admin_user}}"
+    password: "{{users.zabbix_admin_password}}"
+    body: '{"jsonrpc": "2.0","method": "user.login","params": {"user": "{{zabbix_admin_user}}","password": "{{users.zabbix_admin_password}}"},"id": 1,"auth": null}'
+  register: token
+
+- name: Set a email media type
+  uri:
+    url: "{{ zabbix_url }}/api_jsonrpc.php"
+    method: POST
+    headers: 
+      Content-Type: application/json-rpc
+    body_format: json
+    body: '{
+      "jsonrpc": "2.0",
+      "method": "mediatype.update",
+      "params": {
+        "mediatypeid": "1",
+        "passwd": "{{ users.zabbix_email_password }}",
+        "smtp_authentication": "1",
+        "smtp_email": "zabbix_erc@fssprus.ru",
+        "smtp_helo": "{{ansible_fqdn}}",
+        "smtp_port": "25",
+        "smtp_security": "0",
+        "smtp_server": "10.0.0.1",
+        "smtp_verify_host": "0",
+        "smtp_verify_peer": "0",
+        "status": "0",
+        "type": "0",
+        "username": "zabbix_erc@fssprus.ru"
+        },
+      "auth": "{{ token.json.result }}",
+      "id": 1
+      }'
+  when: token.json.error is not defined
+
+- name: Set a media to user
+  uri:
+    url: "{{ zabbix_url }}/api_jsonrpc.php"
+    method: POST
+    headers: 
+      Content-Type: application/json-rpc
+    body_format: json
+    body: '{
+      "jsonrpc": "2.0",
+      "method": "user.updatemedia",
+      "params":{
+        "users":[{"userid": "1"}],
+        "medias": {
+          "mediatypeid":"1",
+          "sendto":"pasdla1900@mail.ru",
+          "active":0,
+          "period": "1-7,00:00-24:00",
+          "severity":48 
+        }
+      },
+      "auth": "{{ token.json.result }}",
+      "id": 1
+    }'
+  when: token.json.error is not defined  

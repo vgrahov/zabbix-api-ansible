@@ -1,0 +1,7 @@
+---
+- name: "Configure zabbix-agent database server"
+  include: agent_db_config.yml
+  when: ("'ERC_DB-servers' in group_names") or 
+        ("'ERC_DBxM-servers' in group_names") or 
+        ("'ERC_DBxS-servers' in group_names")
+  tags: debug

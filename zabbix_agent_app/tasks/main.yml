@@ -1,0 +1,7 @@
+---
+- name: "Configure zabbix-agent application server"
+  include: agent_app_config.yml
+  when:
+    - "'ERC_APPx-servers' in group_names"
+
+    

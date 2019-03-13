@@ -1,0 +1,22 @@
+---
+- name: "Set application template on zabbix"
+  local_action:
+    module: zabbix_template
+    server_url: "{{ zabbix_url }}"
+    login_user: "{{zabbix_admin_user}}"
+    login_password: "{{users.zabbix_admin_password}}"
+    template_groups: Templates
+    template_name: "1CServices_health"
+    template_json: "{{ lookup('file','1CServices_health.json') }}"
+    state: present
+
+- name: "Set postgresql template on zabbix"
+  local_action:
+    module: zabbix_template
+    server_url: "{{ zabbix_url }}"
+    login_user: "{{zabbix_admin_user}}"
+    login_password: "{{ users.zabbix_admin_password }}"
+    template_groups: Templates
+    template_name: "Template App PostgreSQL"
+    template_json: "{{ lookup('file','Template_App_PostgreSQL.json') }}"
+    state: present

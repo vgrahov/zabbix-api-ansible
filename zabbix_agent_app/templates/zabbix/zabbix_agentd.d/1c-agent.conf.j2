@@ -1,0 +1,11 @@
+#for example /opt/1C/v8.3/x86_64/rac infobase --cluster=514fe586-14cc-11e8-fb8a-005056aa6c20 --cluster-user=Администратор --cluster-pwd=123  summary list
+#Provided Ansible
+UserParameter=onec-session,/opt/1C/v8.3/x86_64/rac session --cluster={{ result.stdout }} --cluster-user={{ cluster_user }} --cluster-pwd={{ cluster_pwd }} list | grep 1CV8C | wc -l
+UserParameter=onec-bgj,/opt/1C/v8.3/x86_64/rac session --cluster={{ result.stdout }} --cluster-user={{ cluster_user }} --cluster-pwd={{ cluster_pwd }} list | grep BackgroundJob | wc -l
+UserParameter=onec-webcl,/opt/1C/v8.3/x86_64/rac session --cluster={{ result.stdout }} --cluster-user={{ cluster_user }} --cluster-pwd={{ cluster_pwd }} list | grep WebClient | wc -l
+UserParameter=servers_in_cluster,/opt/1C/v8.3/x86_64/rac server list --cluster={{ result.stdout }} --cluster-user={{ cluster_user }} --cluster-pwd={{ cluster_pwd }} | grep agent-host | awk '{print($3)}'
+UserParameter=rmngr.health,ps -e | grep rmngr | wc -l
+UserParameter=ras.health,ps -e | grep ras | wc -l
+UserParameter=server.status,/var/lib/zabbix/server_status.sh | grep '[1 | 0]'
+UserParameter=ragent.status,/etc/init.d/srv1cv83 status | grep NOT | wc -l
+

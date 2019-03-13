@@ -1,0 +1,49 @@
+---
+# tasks file for zabbix_agent
+- name: "Set package name"
+  set_fact:
+    zabbix_agent_package: "zabbix-agent"
+    zabbix_sender_package: "zabbix-sender"
+    zabbix_get_package: "zabbix-get"
+  
+- name: "Installing zabbix-agent"
+  yum:
+    name:
+      - zabbix-agent
+    state: present
+  
+- name: "Open firewall port for agent"
+  iptables:
+    action: insert
+    chain: INPUT
+    protocol: tcp
+    destination_port: "10050"
+    ctstate: NEW
+    jump: ACCEPT
+    comment: "Ansible: Zabbix-agent"
+  register: iptables
+
+- name: Save iptables rules
+  shell: iptables-save > /etc/sysconfig/iptables
+  when: "iptables.changed"
+
+- name: "Gathering facts"
+  setup:
+    gather_subset: network
+  
+- name: "Get ip and hostname monitoring server"
+  set_fact:
+      key_value: host_monitor
+  loop: "{{ groups['ERC_MONITORING-servers'] }}"
+  register: host_monitor
+  
+- name: "Common tasks for all agent instanses"
+  template:
+      dest: /etc/zabbix/zabbix_agentd.conf
+      src: zabbix/zabbix_agentd.conf.j2
+      
+- name: "Enable the service"
+  service:
+    name: "{{ zabbix_agent_service }}"
+    enabled: yes
+    state: started

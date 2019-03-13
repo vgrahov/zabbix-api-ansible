@@ -1,0 +1,163 @@
+---
+# tasks file for zabbix_server
+- name: "Gathering facts"
+  setup:
+    gather_subset: network
+  tags: debug  
+
+- name: "Set zabbix package name"
+  set_fact:
+    zabbix_server_package: "zabbix-server-{{ zabbix_server_database }}"
+    zabbix_web_package: "zabbix-web-{{ zabbix_server_database }}"
+    datafiles_path: "/usr/share/doc/zabbix-server-{{
+    zabbix_server_database_long }}-{{ zabbix_version }}.3"
+
+- name: "Installing zabbix-server-{{ zabbix_server_database }}"
+  yum:
+    name:
+      - "{{ zabbix_server_package }}"
+      - "{{ zabbix_web_package }}"
+    state: present
+
+- name: Open firewall ports for monitoring
+  iptables:
+    action: insert
+    chain: INPUT
+    protocol: tcp
+    destination_port: "{{item}}"
+    ctstate: NEW
+    jump: ACCEPT
+    comment: "Ansible: Zabbix"
+  with_items:
+    - "10050"
+    - "{{zabbix_server_listenport}}"
+    - "{{zabbix_server_dbport}}"
+    - "80"
+    - "443"
+  register: iptables
+
+- name: Save iptables rules
+  shell: iptables-save > /etc/sysconfig/iptables
+  when: "iptables.changed"
+
+- name: "Set zabbix php timezone"
+  lineinfile:
+    path: /etc/httpd/conf.d/zabbix.conf
+    regexp: '^        # php_value date.timezone'
+    line: '         php_value date.timezone Europe/Moscow'
+    backrefs: true
+    state: present
+
+- name: "Install Mysql Client package IC5"
+  yum:
+    name:
+      - mariadb
+      - mariadb-server
+      - MySQL-python
+    state: present
+  when:
+    - zabbix_server_database == 'mysql'
+
+- name: Ensure mysql starts
+  service:
+    name: mariadb
+    state: started
+    enabled: true
+
+
+- name: "Install related SELinux package"
+  yum:
+    name:
+      - libsemanage-python
+    state: present
+  when:
+    - selinux_allow_zabbix_can_network
+
+- name: "Installing the mysql database"
+  include: "mysql.yml"
+
+- name: Configure Zabbix-server
+  template:
+    src: zabbix_server.conf.j2
+    dest: /etc/zabbix/zabbix_server.conf
+    owner: zabbix
+    group: zabbix
+    mode: 0640
+
+- name: Create include dirs zabbix-server
+  file:
+    path: "{{ zabbix_server_include }}"
+    owner: zabbix
+    group: zabbix
+    state: directory
+    mode: 0755
+
+- name: "Set up a firstrun config"
+  template:
+    src: zabbix.conf.php.j2
+    dest: /etc/zabbix/web/zabbix.conf.php
+    owner: zabbix
+    group: zabbix
+    mode: 0644
+  register: zabbix_conf_php
+
+- name: "Restart services"
+  service:
+    name: "{{ item }}"
+    state: restarted
+  with_items:
+    - httpd
+    - zabbix-server
+  when: "zabbix_conf_php.changed"
+
+- name: "Start http server"
+  service:
+    name: httpd
+    state: started
+    enabled: true
+
+- name: "Zabbix server service"
+  service:
+    name: zabbix-server
+    state: started
+    enabled: true
+
+- name: Get auth token
+  uri:
+    url: "{{ zabbix_url }}/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    headers: 
+      Content-Type: application/json-rpc
+    force_basic_auth: yes
+    user:  "{{zabbix_admin_user}}"
+    password: zabbix
+    body: '{"jsonrpc": "2.0","method": "user.login","params": {"user": "{{zabbix_admin_user}}","password": "{{zabbix_admin_password}}"},"id": 1,"auth": null}'
+  register: token
+
+- name: Set zabbix admin password
+  uri:
+    url: "{{ zabbix_url }}/api_jsonrpc.php"
+    method: POST
+    headers: 
+      Content-Type: application/json-rpc
+    body_format: json
+    body: '{"jsonrpc": "2.0", "method": "user.update", "params": {"output": "extend", "userid": "1", "passwd": "{{users.zabbix_admin_password}}"}, "auth": "{{ token.json.result }}", "id": 1}'
+  when: token.json.error is not defined
+
+- name: set a mediatype 
+  include: "zabbix_media_type.yml" 
+  tags: debug  
+
+
+- name: set a mediatype 
+  include: "zabbix_media_type.yml" 
+
+- name: "Set zabbix host groups"
+  include: "zabbix_group.yml"
+
+- name: "Set zabbix hosts inventory"
+  include: zabbix_hosts.yml
+
+- name: "Add custom templates"
+  include: "app_template.yml"
